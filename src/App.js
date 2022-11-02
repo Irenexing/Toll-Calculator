@@ -3,7 +3,46 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import _ from "lodash";
 import data from "./data/interchanges.json";
-import { ChakraProvider, Center, Select } from "@chakra-ui/react";
+import { ChakraProvider, Center, Select, ModalFocusScope } from "@chakra-ui/react";
+
+const calculateDistance = (routes, locationA, locationB) =>{
+  const routesArray = [];
+  let included = false;
+  let lower;
+  let higher;
+  let totalDistance = 0;
+
+  if (locationA.id < locationB.id) {
+    lower = locationA;
+    higher = locationB;
+  } else {
+    lower = locationB;
+    higher = locationA;
+  }
+
+  for (const route of routes) {
+    if (lower.id === route.id) {
+      included = true;
+    }
+
+    if (higher.id === route.id) {
+      routesArray.push(route);
+      included = false;
+    }
+
+    if (included) {
+      routesArray.push(route);
+    }
+  }
+
+  for (const route of routesArray) {
+    totalDistance += route.routes[0].distance;
+  }
+
+  totalDistance -= routesArray[routesArray.length - 1].routes[0].distance;
+
+  return totalDistance.toFixed(3);
+}
 
 function TollCalculator() {
   const [location, setLocation] = useState({});
@@ -44,47 +83,8 @@ function TollCalculator() {
     setOptionB(e.target.value);
   };
 
-  function calculateDistance() {
-    const routesArray = [];
-    let included = false;
-    let lower;
-    let higher;
-    let totalDistance = 0;
-
-    if (locationA.id < locationB.id) {
-      lower = locationA;
-      higher = locationB;
-    } else {
-      lower = locationB;
-      higher = locationA;
-    }
-
-    for (const route of routes) {
-      if (lower.id === route.id) {
-        included = true;
-      }
-
-      if (higher.id === route.id) {
-        routesArray.push(route);
-        included = false;
-      }
-
-      if (included) {
-        routesArray.push(route);
-      }
-    }
-
-    for (const route of routesArray) {
-      totalDistance += route.routes[0].distance;
-    }
-
-    totalDistance -= routesArray[routesArray.length - 1].routes[0].distance;
-
-    return totalDistance;
-  }
-
-  function totalTollCharges() {
-    return calculateDistance() * 0.25;
+  function totalTollCharges(routes, start, end) {
+    return calculateDistance(routes, start, end) * 0.25;
   }
 
   const handleSubmit = (e) => {
@@ -136,8 +136,14 @@ function TollCalculator() {
           </button>
           {!locationA == "" && !locationB == "" && (
             <>
-              <p>Distance: {calculateDistance().toFixed(3)}</p>
-              <p>Total Charges: {totalTollCharges().toFixed(2)}</p>
+              <p>
+                Distance:{" "}
+                {calculateDistance(routes, locationA, locationB)}
+              </p>
+              <p>
+                Total Charges:{" "}
+                {totalTollCharges(routes, locationA, locationB).toFixed(2)}
+              </p>
             </>
           )}
         </form>
@@ -147,3 +153,4 @@ function TollCalculator() {
 }
 
 export default TollCalculator;
+module.exports = calculateDistance; 
