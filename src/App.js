@@ -1,6 +1,9 @@
 import "./App.scss";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import _ from "lodash";
+import data from "./data/interchanges.json";
+import { ChakraProvider, Center, Select } from "@chakra-ui/react";
 
 function TollCalculator() {
   const [location, setLocation] = useState({});
@@ -10,73 +13,136 @@ function TollCalculator() {
   const [locationB, setLocationB] = useState("");
 
   useEffect(() => {
-    axios
-      .get(`http://localhost:8080/`)
-      .then((res) => {
-        setLocation(res.data);
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+    async function fetchData(setLocation) {
+      let result = await axios.get(`http://localhost:8080/`);
+      setLocation(result.data);
+    }
+    fetchData(setLocation);
   }, []);
 
-  if (location === null) {
+  const locations = location.locations || {};
+
+  const arrayNumber = Object.keys(locations);
+
+  if (_.isEmpty(locations)) {
     return <main className="loading">Loading...</main>;
   }
 
-  const locations = location.locations;
-  const arrayNumber = Object.keys(locations);
-  const route = [];
-  //iterate through array
+  const routes = [];
+  // iterate through array
   for (const i of arrayNumber) {
-    route.push(locations[i]);
+    routes.push(locations[i]);
+    // add id to the routes array for easier access
+    routes[routes.length - 1].id = i;
   }
 
-  route.forEach((route, i) => {
-    route.id = i+1;
-  })
-
-  const handleOptionA =(e) => {
-    setOptionA(e.target.value)
-  }
-  const handleOptionB =(e) => {
-    setOptionB(e.target.value)
-  }
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    console.log("hi");
+  const handleOptionA = (e) => {
+    setOptionA(e.target.value);
   };
 
-  const pointA =route.find((route) => {
-    return route.name === optionA;
-  })
+  const handleOptionB = (e) => {
+    setOptionB(e.target.value);
+  };
 
-  const pointB =route.find((route) => {
-    return route.name === optionB;
-  })
-  console.log (pointA, pointB)
+  function calculateDistance() {
+    const routesArray = [];
+    let included = false;
+    let lower;
+    let higher;
+    let totalDistance = 0;
+
+    if (locationA.id < locationB.id) {
+      lower = locationA;
+      higher = locationB;
+    } else {
+      lower = locationB;
+      higher = locationA;
+    }
+
+    for (const route of routes) {
+      if (lower.id === route.id) {
+        included = true;
+      }
+
+      if (higher.id === route.id) {
+        routesArray.push(route);
+        included = false;
+      }
+
+      if (included) {
+        routesArray.push(route);
+      }
+    }
+
+    for (const route of routesArray) {
+      totalDistance += route.routes[0].distance;
+    }
+
+    totalDistance -= routesArray[routesArray.length - 1].routes[0].distance;
+
+    return totalDistance;
+  }
+
+  function totalTollCharges() {
+    return calculateDistance() * 0.25;
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    const pointA = routes.find((route) => {
+      return route.name === optionA;
+    });
+
+    const pointB = routes.find((route) => {
+      return route.name === optionB;
+    });
+
+    setLocationA(pointA);
+    setLocationB(pointB);
+  };
 
   return (
-    <div className="toll">
-      <header>TOLL CALCULATOR</header>
-      <form onSubmit={handleSubmit}>
-        <select>
-          <option>Open this select menu</option>
-          {route.map((pointA) => {
-            return <option value={arrayNumber} onClick ={handleOptionA}>{pointA}</option>;
-          })}
-        </select>
-        <select>
-          <option>Open this select menu</option>
-          {route.map((pointB) => {
-            return <option value={arrayNumber} onClick = {handleOptionB}>{pointB}</option>;
-          })}
-        </select>
-        <button>Calculate</button>
-      </form>
-      <p></p>
-    </div>
+    <ChakraProvider>
+      <Center bg="lightblue" h="100vh" color="black">
+        <form onSubmit={handleSubmit}>
+          <Select
+            placeholder="Point A"
+            value={optionA}
+            onChange={handleOptionA}
+          >
+            {routes &&
+              routes.map((route) => {
+                return <option className="menu__option">{route.name}</option>;
+              })}
+          </Select>
+          <Select
+            placeholder="Point B"
+            value={optionB}
+            onChange={handleOptionB}
+          >
+            {routes &&
+              routes.map((route) => {
+                return <option className="menu__option">{route.name}</option>;
+              })}
+          </Select>
+
+          <button
+            className="button"
+            type="submit"
+            disabled={optionA === "Point A" || optionB === "Point B"}
+          >
+            Submit
+          </button>
+          {!locationA == "" && !locationB == "" && (
+            <>
+              <p>Distance: {calculateDistance().toFixed(3)}</p>
+              <p>Total Charges: {totalTollCharges().toFixed(2)}</p>
+            </>
+          )}
+        </form>
+      </Center>
+    </ChakraProvider>
   );
 }
 
